@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python3.8
 
 #####################################################################################################################
 # This script is to insert about half the system memory data into redis cluster to test things out
