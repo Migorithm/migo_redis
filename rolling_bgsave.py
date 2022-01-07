@@ -2,9 +2,6 @@
 
 #####################################################################################################################
 # This script is to execute bgsave sequentially to avoid temoporary yet perhaps significant latency load on cluster
-# The action plan is first, we will see master node of  
-#
-#
 #
 #
 #####################################################################################################################
@@ -34,15 +31,21 @@ def connector():
         except Exception as e:
             pass
     else:
-        print("No connection available")
+        print("[ERROR] No connection available")   
         sys.exit(1)
 
+#teams, telegram 
+
 def background_save(redis_cluster):
-    print("Background will begin to save a backup...")
     for instance in redis_cluster.info().keys():
         if platform.system() == "Linux": 
-            print(f"Node : {instance} runs background save...")
-            subprocess.run(f"redis-cli -a {auth} -h {instance[:-4]} -p {instance[-5:]} bgsave 2>/dev/null",shell=True)
+            print(f"[PROCESS] '{instance}' runs background save...")
+            
+            run=subprocess.run(f"redis-cli -a {auth} -h {instance[:-4]} -p {instance[-5:]} bgsave 2>/dev/null",shell=True) #remove subprocess part 
+            if run.returncode != 0:
+                print(f"[ERROR] Background saving process in '{instance}' failed. Check out the server")
+            else:
+                print(f"[SUCCESS] Background saving process in '{instance}' succeeded.")
             time.sleep(3)
         else:
             pass
