@@ -2,7 +2,7 @@
 #####################################################################################################################
 # This script is to manage a number of rdb files on Redis server. 
 # Cron job is required.
-# 
+# Parameter which indicates directory that contains redis configuration file(s) must be given. 
 #
 #
 #

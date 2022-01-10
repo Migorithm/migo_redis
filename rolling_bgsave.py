@@ -34,7 +34,6 @@ def connector():
         print("[ERROR] No connection available")   
         sys.exit(1)
 
-#teams, telegram 
 
 def background_save(redis_cluster):
     for instance in redis_cluster.info().keys():

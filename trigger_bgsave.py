@@ -10,35 +10,44 @@
 #####################################################################################################################
 
 #logrotate   -> /etc/logrotate.d/  
-# /var/log/redis/*.rdb {
+# /var/lib/redis/6379/*.rdb {
 # rotate 3
 # missing ok 
 # create 640 root root
 # }   --> minimum interval you can set is hour. 
 
-#connection method change...
-#rdb file name change and save logic... 
-# telegram 
+#Telegram VerticalData Monitoring
+#KEY="708645774:AAHyhyDG25cEzP4-tVowYiJ7UeuT-4Yy5EE"
+#CHAT_ID="-1001134643671"
 
 
-
+from typing import KeysView
 from rediscluster import RedisCluster
+import redis
 import sys, argparse
 import platform
-import subprocess
 import time
+import datetime
+import requests
+import json
 
 
 parser = argparse.ArgumentParser() #Initialize parser
 parser.add_argument("-a","--auth",help="masterauth to get an access to cluster.",required=True)
-parser.add_argument("-b","--bootstrap-server",help="bootstrap-server list for cluster dicovery",nargs="+",required=True) # To get list of argument
+parser.add_argument("-b","--bootstrap_server",help="bootstrap-server list for cluster dicovery",nargs="+",required=True) # To get list of argument
 args = parser.parse_args()
 auth=args.auth
 servers=args.bootstrap_server
+load_json=json.load(open("./telekey.json"))
+key= load_json.get("KEY")
+chat_id=load_json.get("CHAT_ID")
+
+telegram_url=f"https://api.telegram.org/bot{key}/sendMessage?parse-mod=html&chat_id={chat_id}"
+
 
 def connector():
     rc="" #initialize
-    startup_nodes = [f"redis://password@{x}" for x in servers]
+    startup_nodes = [f"redis://:{auth}@{x}" for x in servers]
     for protocol in startup_nodes:
         try :
             rc= RedisCluster.from_url(protocol, decode_responses =True)
@@ -50,18 +59,33 @@ def connector():
         print("[ERROR] No connection available")
         sys.exit(1)
 
+def telegram(connetectable,servers):
+    message={"text":""}
+    for instance in servers:
+        if instance not in connetectable:
+            message["text"]=f"[ERROR] Redis Instance '{instance}' not connectable."
+            requests.post(telegram_url,message)
+
+
 def trigger_save(redis_cluster):
     if len(redis_cluster.info().keys()) != len(servers):
         print("[ERROR] Node count not match.")
+
+        #Send a message
+        telegram(redis_cluster.info().keys(),servers)
+
         for instance in redis_cluster.info().keys():
-            master= redis_cluster.info()[instance].get("slave0",False)  # role : master
-            if master and platform.system() == "Linux": 
+            role= redis_cluster.info()[instance].get("role",False) 
+            if role == "master" and platform.system() == "Linux": 
                 try_count=0
                 while try_count <3:
-                    #naming rc.config_set("dbfilename","datetime"), while using 'logrotate' to delete old rdb.
                     print(f"[PROCESS] Master node '{instance}' attempts to run background save...")
-                    run=subprocess.run(f"redis-cli -a {auth} -h {master[:-4]} -p {master[-4:]} bgsave 2>/dev/null",shell=True)
-                    if run.returncode != 0:
+                    current_time=datetime.datetime.now().strftime("%Y-%h-%d:%H.%M.%S")
+                    connection = redis.from_url(f"redis://:{auth}@{instance}")
+                    success=None #initialize
+                    if connection.config_set("dbfilename",f"{current_time}.rdb"):
+                        success=connection.bgsave()
+                    if not success:
                         print(f"[ERROR] Background saving process in '{instance}' failed. Check out the server")
                         try_count+=1
                         time.sleep(0.5)
