@@ -25,7 +25,7 @@ prefix=args.prefix
 
 def connector():
     rc="" #initialize
-    startup_nodes = [f"redis://:{auth}@{x}" for x in servers]
+    startup_nodes = [ f"redis://:{auth}@{x}" for x in servers ]
     for protocol in startup_nodes:
         try :
             rc= RedisCluster.from_url(protocol, decode_responses =True)
@@ -39,7 +39,7 @@ def connector():
 
 def key_finder(connector):
     con = connector
-    for key in con.scan(match=f"{prefix}*"):
+    for key in con.scan_iter(match=f"{prefix}*"):
         print(key)
 
 
