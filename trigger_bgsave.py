@@ -16,12 +16,6 @@
 # create 640 root root
 # }   --> minimum interval you can set is hour. 
 
-#Telegram VerticalData Monitoring
-#KEY="708645774:AAHyhyDG25cEzP4-tVowYiJ7UeuT-4Yy5EE"
-#CHAT_ID="-1001134643671"
-
-
-from typing import KeysView
 from rediscluster import RedisCluster
 import redis
 import sys, argparse
