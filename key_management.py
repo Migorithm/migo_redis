@@ -6,25 +6,28 @@
 # 
 # Exaplantion on 'mode' argument 
 # f - finding all keys for a given prefix
-# d - dectecting keys that are not conforming to prefix rules
-# c - finding all keys and count them
+# d - dectecting keys that are not conforming to prefix rules and count them all.
 #
 #
 # Explanation on 'usecase' argument
-# farma - RedisFarmA
-# farmb - RedisFarmB
 # farm0 - RedisFarm0
+# farma - RedisFarmA
+# farmb1 - RedisFarmB1
+# farmb2 - RedisFarmB2
 #####################################################################################################################
 
-from rediscluster import RedisCluster 
+from rediscluster import RedisCluster
+import redis 
 import argparse
 import csv
-import concurrent.futures
-import threading
+from pathos.multiprocessing import ProcessingPool as Pool
+import sys
+from collections import deque
+from elasticsearch import helpers
 
 parser=argparse.ArgumentParser()
 parser.add_argument("-p","--prefix",required=True,help="Specify prefix with which the key start.")
-parser.add_argument("-b","--bootstrap_server",nargs="+",required=True)
+parser.add_argument("-b","--bootstrap_server",required=True,help="Specify the path to serverlist file")
 parser.add_argument("-a","--auth",required=True)
 parser.add_argument("-m","--mode",required=True) 
 parser.add_argument("-u","--usecase",required=True)
@@ -36,13 +39,19 @@ prefix=args.prefix
 mode=args.mode
 usecase=args.usecase
 
-thread_local=threading.local()
+def get_serverlist():
+    server_list=[]
+    with open(servers,"r") as f:
+        csv_reader=csv.DictReader(f)
+        for server in csv_reader:
+            server_list.append(server[usecase])
+    return server_list
 
 def connector():
-    startup_nodes = [ f"redis://:{auth}@{x}" for x in servers ]
+    startup_nodes = [ f"redis://:{auth}@{x}" for x in get_serverlist() ]
     for protocol in startup_nodes:
         try :
-            rc= RedisCluster.from_url(protocol, decode_responses =True)
+            rc= RedisCluster.from_url(protocol, decode_responses =False)
             #If succeeded,
             return rc
         except Exception as e:
@@ -52,49 +61,46 @@ def connector():
         sys.exit(1)
 
 def get_session():
-    if not hasattr(thread_local,"session"):
-        thread_local.session = connector()
-    return thread_local.session
+    cluster_con = connector()
+    masters=list(cluster_con.scan().keys())
+    master_sessions = [redis.from_url(f"redis://:{auth}@{x}") for x in masters]
+    return master_sessions
+
 
 def get_prefixes():
-    prefixes = []
+    prefixes = {}
     with open("prefixes.csv","r") as f:
         csv_reader = csv.DictReader(f)
         for row in csv_reader:
-            prefixes.append(row[usecase])
+            if row[usecase] != "":
+                prefixes[str(bytes(row[usecase],"utf-8")).split(":")[0]]=True #True == 1 
     return prefixes
 
 def key_finder():
-    session = get_session()
+    session = connector()
     for key in session.scan_iter(match=f"{prefix}*"):
         print(key)
 
-def illegal_keys(prefixes):  
-    session=get_session()
+
+def illegal_keys(session):  
+    prefix_dict=get_prefixes()
     for key in session.scan_iter():
-        for comparatives in prefixes:
-            if key.startswith(comparatives):
-                break
+        if not prefix_dict.get(str(key).split(":")[0],False):
+            print(f"[ERROR] key '{key}' violoates prefix rules ")
+            prefix_dict[str(key).split(":")[0]]=True
         else:
-            print(f"[ERROR] key '{key}' violoates prefix rules")
+            prefix_dict[str(key).split(":")[0]]+=1
+    print(prefix_dict)
 
+def all_illegal_keys(master_sessions):
+    with Pool(3) as executor:
+        results = executor.map(illegal_keys,master_sessions)
+    for result in results:
+        print(result)
 
-def key_counter(prefix):
-    session=get_session()
-    cnt=0
-    for key in session.scan_iter(match=f"{prefix}*"):
-        cnt += 1 
-    print(f"{prefix} : {cnt}")
-
-def all_key_counter(list_of_prefixes):
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-        executor.map(key_counter,list_of_prefixes)
-
-    
 if __name__ == "__main__":
     if mode == "f":
         key_finder()
     elif mode == "d":
-        illegal_keys(get_prefixes())
-    elif mode == "c":            
-        all_key_counter(get_prefixes())
+        all_illegal_keys(get_session())
+
