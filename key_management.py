@@ -22,8 +22,7 @@ import argparse
 import csv
 from pathos.multiprocessing import ProcessingPool as Pool
 import sys
-from collections import deque
-from elasticsearch import helpers
+
 
 parser=argparse.ArgumentParser()
 parser.add_argument("-p","--prefix",required=True,help="Specify prefix with which the key start.")
@@ -76,11 +75,15 @@ def get_prefixes():
                 prefixes[str(bytes(row[usecase],"utf-8")).split(":")[0]]=True #True == 1 
     return prefixes
 
-def key_finder():
-    session = connector()
-    for key in session.scan_iter(match=f"{prefix}*"):
+
+
+def key_finder(self,session):
+    for key in session.scan_iter(match=f"{self.prefix}*"):
         print(key)
 
+def all_key_finder(self,master_sessions):
+    with Pool(3) as executor:
+        executor.map(self.key_finder,master_sessions)
 
 def illegal_keys(session):  
     prefix_dict=get_prefixes()
@@ -100,7 +103,7 @@ def all_illegal_keys(master_sessions):
 
 if __name__ == "__main__":
     if mode == "f":
-        key_finder()
+        all_key_finder(get_session())
     elif mode == "d":
         all_illegal_keys(get_session())
 

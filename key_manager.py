@@ -23,9 +23,6 @@ import csv
 from pathos.multiprocessing import ProcessingPool as Pool
 import sys
 
-
-
-
 class RedisKeyManager:
     parser=argparse.ArgumentParser()
     parser.add_argument("-p","--prefix",required=True,help="Specify prefix with which the key start.")
@@ -79,10 +76,13 @@ class RedisKeyManager:
         return prefixes
 
 
-    def key_finder(self):
-        session = self.connector()
+    def key_finder(self,session):
         for key in session.scan_iter(match=f"{self.prefix}*"):
             print(key)
+
+    def all_key_finder(self,master_sessions):
+        with Pool(3) as executor:
+            executor.map(self.key_finder,master_sessions)
 
 
     def illegal_keys(self,session):  
@@ -105,7 +105,7 @@ class RedisKeyManager:
 
 if __name__ == "__main__":
     key_manager=RedisKeyManager()
-    if key_manager.mode == "f":
-        key_manager.key_finder()
+    if key_manager.mode == "f" and key_manager.prefix:
+        key_manager.all_key_finder(key_manager.get_session())
     elif key_manager.mode == "d":
         key_manager.all_illegal_keys(key_manager.get_session())
