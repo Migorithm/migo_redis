@@ -72,7 +72,7 @@ class RedisKeyManager:
             csv_reader = csv.DictReader(f)
             for row in csv_reader:
                 if row[self.usecase] != "":
-                    prefixes[str(bytes(row[self.usecase],"utf-8")).split(":")[0]]=True #True == 1 
+                    prefixes[str(bytes(row[self.usecase],"utf-8")).split(":",1)[0]]=True #True == 1 
         return prefixes
 
 
@@ -89,12 +89,12 @@ class RedisKeyManager:
         prefix_dict=self.get_prefixes()
         prefix_dict["violation"] = []
         for key in session.scan_iter():
-            if not prefix_dict.get(str(key).split(":")[0],False):
+            if not prefix_dict.get(str(key).split(":",1)[0],False):
                 print(f"[ERROR] key '{str(key)[2:-2]}' violoates prefix rules ")
-                prefix_dict["violation"].append(str(key).split(":")[0])
-                prefix_dict[str(key).split(":")[0]]=True
+                prefix_dict["violation"].append(str(key).split(":",1)[0])
+                prefix_dict[str(key).split(":",1)[0]]=True
             else:
-                prefix_dict[str(key).split(":")[0]]+=1
+                prefix_dict[str(key).split(":",1)[0]]+=1
         for k,v in prefix_dict.items():
             print(f"[COUNT] {k[2:]} {v}")
 

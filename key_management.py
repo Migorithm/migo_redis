@@ -72,7 +72,7 @@ def get_prefixes():
         csv_reader = csv.DictReader(f)
         for row in csv_reader:
             if row[usecase] != "":
-                prefixes[str(bytes(row[usecase],"utf-8")).split(":")[0]]=True #True == 1 
+                prefixes[str(bytes(row[usecase],"utf-8")).split(":",1)[0]]=True #True == 1 
     return prefixes
 
 
@@ -88,11 +88,11 @@ def all_key_finder(self,master_sessions):
 def illegal_keys(session):  
     prefix_dict=get_prefixes()
     for key in session.scan_iter():
-        if not prefix_dict.get(str(key).split(":")[0],False):
+        if not prefix_dict.get(str(key).split(":",1)[0],False):
             print(f"[ERROR] key '{key}' violoates prefix rules ")
-            prefix_dict[str(key).split(":")[0]]=True
+            prefix_dict[str(key).split(":",1)[0]]=True
         else:
-            prefix_dict[str(key).split(":")[0]]+=1
+            prefix_dict[str(key).split(":",1)[0]]+=1
     print(prefix_dict)
 
 def all_illegal_keys(master_sessions):
